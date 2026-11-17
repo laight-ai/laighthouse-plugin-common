@@ -75,14 +75,17 @@ def files_under(base, folder):
 def plan(source, repo, config):
     """[(종류, 사본 경로, 써야 할 내용)] — 종류는 differs/missing/extra. 사본 경로는 플러그인 레포 기준.
 
-    extra는 include가 폴더일 때 그 폴더 안에 있지만 공통 레포에는 없는 사본이다(공통 레포에서 지우거나 이름을 바꾼 파일).
+    extra는 공통 레포에 있는 폴더 안에 있지만 공통 레포에는 없는 사본이다(공통 레포에서 지우거나 이름을 바꾼 파일).
+    공통 레포에 없는 폴더(스킬 폴더 안 bundle_skills.py 사본 등)의 파일은 플러그인이 관리하므로 보지 않는다.
     """
     out = []
     for target in config["targets"]:
         for include in target["include"]:
             wanted = expand(source, include)
             if os.path.isdir(os.path.join(source, include)):
-                for rel in sorted(set(files_under(os.path.join(repo, target["root"]), include)) - set(wanted)):
+                have = files_under(os.path.join(repo, target["root"]), include)
+                stale = [r for r in have if os.path.isdir(os.path.join(source, os.path.dirname(r)))]
+                for rel in sorted(set(stale) - set(wanted)):
                     out.append(("extra", os.path.normpath(os.path.join(target["root"], rel)).replace(os.sep, "/"), None))
             for rel in wanted:
                 dst = os.path.normpath(os.path.join(target["root"], rel)).replace(os.sep, "/")

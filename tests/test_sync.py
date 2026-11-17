@@ -101,3 +101,13 @@ def test_copy_removed_from_common_is_reported_and_deleted(plugin, common, capsys
     capsys.readouterr()
     assert sync.main(["--repo", plugin, "--check"]) == 1
     assert capsys.readouterr().out.splitlines() == ["extra: plugins/p/shared/kit/old_name.py"]
+
+
+def test_bundle_copies_inside_included_skill_are_not_extra(plugin, common):
+    # bundle_skills.py가 스킬 폴더 안에 만드는 사본(공통 레포에 없는 폴더)은 공통 레포가 관리하지 않는다
+    sync.main(["--repo", plugin])
+    bundled = f"{plugin}/plugins/p/skills/demo/shared/assets/kit.py"
+    write(bundled, "bundle 사본\n")
+    assert sync.main(["--repo", plugin, "--check"]) == 0
+    sync.main(["--repo", plugin])
+    assert read(bundled) == "bundle 사본\n"
