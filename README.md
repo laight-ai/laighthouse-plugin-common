@@ -60,7 +60,8 @@
    external은 이어서 `python3 gpt/sync_from_claude.py`로 GPT판도 맞춥니다.
 5. 원본·사본·`common.json`을 함께 커밋합니다.
 
-`sync.py --check`는 사본이 `common.json`의 태그와 같은지만 보고, 어긋나면 목록을 내고 1로 끝납니다.
+`sync.py --check`는 사본이 `common.json`의 태그와 같은지만 보고, 어긋나면 목록(differs·missing, 그리고 공통 레포에서 지운 파일의
+옛 사본인 extra)을 내고 1로 끝납니다. `--check` 없이 실행하면 extra는 지웁니다.
 플러그인 레포의 CI가 PR마다 이 검사를 돌립니다.
 
 ## 테스트

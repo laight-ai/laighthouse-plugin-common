@@ -88,3 +88,16 @@ def test_unknown_tag_stops_with_message(plugin, common):
     write(f"{plugin}/common.json", json.dumps(cfg))
     with pytest.raises(SystemExit, match="v9"):
         sync.main(["--repo", plugin])
+
+
+def test_copy_removed_from_common_is_reported_and_deleted(plugin, common, capsys):
+    # 공통 레포에서 지우거나 이름을 바꾼 파일의 옛 사본이 include 폴더에 남으면 안 된다
+    write(f"{plugin}/plugins/p/shared/kit/old_name.py", "옛 사본\n")
+    sync.main(["--repo", plugin])
+    assert not os.path.exists(f"{plugin}/plugins/p/shared/kit/old_name.py")
+    assert read(f"{plugin}/plugins/p/shared/own.py") == "플러그인 고유 파일\n"   # include 밖은 그대로
+
+    write(f"{plugin}/plugins/p/shared/kit/old_name.py", "옛 사본\n")
+    capsys.readouterr()
+    assert sync.main(["--repo", plugin, "--check"]) == 1
+    assert capsys.readouterr().out.splitlines() == ["extra: plugins/p/shared/kit/old_name.py"]

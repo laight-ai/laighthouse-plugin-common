@@ -52,27 +52,39 @@ def export_tag(version, dest):
 
 
 def expand(source, include):
-    """include 경로를 source 안의 파일 목록(상대 경로)으로 펼친다. __pycache__·*.pyc는 뺀다."""
+    """include 경로를 source 안의 파일 목록(상대 경로)으로 펼친다."""
     path = os.path.join(source, include)
     if os.path.isfile(path):
         return [include]
     if not os.path.isdir(path):
         raise SystemExit(f"공통 레포에 없는 경로: {include}")
+    return files_under(source, include)
+
+
+def files_under(base, folder):
+    """base/folder 아래 파일(base 기준 상대 경로). __pycache__·*.pyc는 뺀다. 폴더가 없으면 빈 목록."""
     found = []
-    for dirpath, dirnames, files in os.walk(path):
+    for dirpath, dirnames, files in os.walk(os.path.join(base, folder)):
         dirnames[:] = [d for d in dirnames if d != "__pycache__"]
         for f in files:
             if not f.endswith(".pyc"):
-                found.append(os.path.relpath(os.path.join(dirpath, f), source).replace(os.sep, "/"))
+                found.append(os.path.relpath(os.path.join(dirpath, f), base).replace(os.sep, "/"))
     return sorted(found)
 
 
 def plan(source, repo, config):
-    """[(종류, 사본 경로, 써야 할 내용)] — 종류는 differs/missing. 사본 경로는 플러그인 레포 기준."""
+    """[(종류, 사본 경로, 써야 할 내용)] — 종류는 differs/missing/extra. 사본 경로는 플러그인 레포 기준.
+
+    extra는 include가 폴더일 때 그 폴더 안에 있지만 공통 레포에는 없는 사본이다(공통 레포에서 지우거나 이름을 바꾼 파일).
+    """
     out = []
     for target in config["targets"]:
         for include in target["include"]:
-            for rel in expand(source, include):
+            wanted = expand(source, include)
+            if os.path.isdir(os.path.join(source, include)):
+                for rel in sorted(set(files_under(os.path.join(repo, target["root"]), include)) - set(wanted)):
+                    out.append(("extra", os.path.normpath(os.path.join(target["root"], rel)).replace(os.sep, "/"), None))
+            for rel in wanted:
                 dst = os.path.normpath(os.path.join(target["root"], rel)).replace(os.sep, "/")
                 want = read(os.path.join(source, rel))
                 if not os.path.exists(os.path.join(repo, dst)):
@@ -109,13 +121,17 @@ def main(argv=None):
                 print(f"사본이 공통 레포({label})와 어긋났다 — sync.py를 --check 없이 실행해 맞춘다", file=sys.stderr)
                 return 1
             return 0
-        for _, dst, want in problems:
+        for kind, dst, want in problems:
             path = os.path.join(args.repo, dst)
+            if kind == "extra":
+                os.remove(path)
+                print(f"삭제: {dst}")
+                continue
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "wb") as f:
                 f.write(want)
             print(f"복사: {dst}")
-        print(f"공통 레포({label})에서 {len(problems)}개 복사")
+        print(f"공통 레포({label})에 맞춰 {len(problems)}개 고침")
     return 0
 
 
