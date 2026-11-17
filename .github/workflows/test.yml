@@ -1,0 +1,24 @@
+# 공통 레포 테스트. 플러그인 레포는 태그의 사본만 받으므로, 태그를 붙이기 전에 이 검사가 main에서 통과해 있어야 한다.
+name: test
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 테스트
+        run: |
+          python -m pip install --quiet pytest==9.2.0
+          python -m pytest -q tests

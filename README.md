@@ -51,7 +51,7 @@
 1. 이 레포에서 고치고 테스트를 돌립니다: `python3 -m pytest tests`. 스킬을 고쳤으면 SKILL.md의 `version`도 올립니다.
 2. 플러그인 레포에서 배포 전 확인을 합니다: `python3 ../laighthouse-plugin-common/sync.py --dev`
    (태그 대신 이 레포의 작업 중인 파일로 사본을 맞춥니다)
-3. 이 레포에 커밋하고 태그를 붙입니다: `git tag v4.0.1`
+3. 이 레포에 커밋하고, main의 CI(`.github/workflows/test.yml`)가 통과한 것을 확인한 뒤 태그를 붙입니다: `git tag v4.0.6`
 4. 플러그인 레포마다 `common.json`의 `version`을 새 태그로 바꾸고 사본을 맞춥니다.
 
    ```sh
