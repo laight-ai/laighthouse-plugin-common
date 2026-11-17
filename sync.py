@@ -8,7 +8,7 @@
 플러그인 레포 루트의 common.json이 가져올 버전(이 레포의 태그)과 파일을 정한다:
 
     {
-      "version": "v0.1.0",
+      "version": "v4.0.0",
       "targets": [
         {"root": "plugins/laighthouse-agency", "include": ["shared/assets/external_context", "hooks/save_responses.py"]}
       ]
@@ -20,21 +20,17 @@ root는 플러그인 폴더(레포 루트 기준), include는 이 레포 안 경
     python3 ../laighthouse-plugin-common/sync.py           # version 태그의 파일로 사본을 맞춘다
     python3 ../laighthouse-plugin-common/sync.py --check   # 어긋난 사본만 보여 주고 1로 끝난다
     python3 ../laighthouse-plugin-common/sync.py --dev     # 태그 대신 이 레포의 작업 중인 파일로 맞춘다(배포 전 확인용)
-
-SKILL.md의 `version:` 줄은 플러그인마다 자기 릴리스 버전을 쓰므로 플러그인 쪽 값을 그대로 둔다.
 """
 import argparse
 import io
 import json
 import os
-import re
 import subprocess
 import sys
 import tarfile
 import tempfile
 
 COMMON = os.path.dirname(os.path.abspath(__file__))
-VERSION_LINE = re.compile(rb"^[ \t]*version:.*$", re.M)
 
 
 def read(path):
@@ -71,16 +67,6 @@ def expand(source, include):
     return sorted(found)
 
 
-def localize(rel, data, dst):
-    """SKILL.md면 첫 `version:` 줄을 플러그인 사본의 것으로 바꾼다."""
-    if os.path.basename(rel) != "SKILL.md" or not os.path.exists(dst):
-        return data
-    mine = VERSION_LINE.search(read(dst))
-    if not mine:
-        return data
-    return VERSION_LINE.sub(lambda _: mine.group(0), data, count=1)
-
-
 def plan(source, repo, config):
     """[(종류, 사본 경로, 써야 할 내용)] — 종류는 differs/missing. 사본 경로는 플러그인 레포 기준."""
     out = []
@@ -88,7 +74,7 @@ def plan(source, repo, config):
         for include in target["include"]:
             for rel in expand(source, include):
                 dst = os.path.normpath(os.path.join(target["root"], rel)).replace(os.sep, "/")
-                want = localize(rel, read(os.path.join(source, rel)), os.path.join(repo, dst))
+                want = read(os.path.join(source, rel))
                 if not os.path.exists(os.path.join(repo, dst)):
                     out.append(("missing", dst, want))
                 elif read(os.path.join(repo, dst)) != want:

@@ -26,20 +26,30 @@
 
 ### 플러그인마다 다른 값
 
-- **SKILL.md의 `metadata.version`:** 플러그인마다 자기 릴리스 버전을 씁니다. `sync.py`는 플러그인 사본의
-  `version:` 줄을 그대로 둡니다. 이 레포의 값(`0.0.0`)은 스킬을 처음 가져갈 때만 들어가므로, 그때 플러그인 버전으로 고칩니다.
 - **`capture_ad_performance.py`:** 동작 차이는 `hooks/hooks.json`의 명령 인자로 고릅니다.
   - `--any-group-by` — group_by가 있으면 차원과 관계없이 캡처합니다(종합 리포트용, agency·external).
     없으면 캠페인·광고그룹·광고 차원이 있을 때만 캡처합니다(analytics).
   - `--short-stub` — 스텁을 차원·지표 이름만으로 짧게 씁니다(prepare.py가 저장 응답을 읽는 플러그인, agency·external).
 - **저장 훅 대상 도구:** `save_responses.py`는 도구를 가리지 않습니다. 플러그인의 `hooks/hooks.json` matcher가 정합니다.
 
+## 버전
+
+- 이 레포의 버전은 git 태그 `vX.Y.Z`입니다. v4.0.0에서 시작합니다(옮겨 온 스킬의 예전 버전 중 가장 높은 3.12.0보다
+  크게 잡아, 어느 플러그인에서도 스킬 버전 숫자가 내려가지 않게 했습니다).
+  - patch(`v4.0.1`): 문구 수정, 버그 수정
+  - minor(`v4.1.0`): 기능 추가
+  - major(`v5.0.0`): 플러그인 쪽도 함께 바꿔야 하는 변경(`hooks.json` 인자, `common.json`의 include 경로 등)
+- 이 레포에 있는 스킬의 SKILL.md `metadata.version`은 그 스킬이 마지막으로 바뀐 태그입니다. 스킬을 고치면 다음에 붙일
+  태그로 올립니다. 세 플러그인에 같은 값이 들어갑니다.
+- 플러그인의 릴리스 버전(`plugin.json`의 `version`)은 이와 따로 각 플러그인이 올립니다. Claude Code는 이 값이 바뀌어야
+  사용자에게 업데이트를 내려 주므로, 공통 레포 태그를 새로 가져온 릴리스에서도 올립니다.
+
 ## 고치는 순서
 
-1. 이 레포에서 고치고 테스트를 돌립니다: `python3 -m pytest tests`
+1. 이 레포에서 고치고 테스트를 돌립니다: `python3 -m pytest tests`. 스킬을 고쳤으면 SKILL.md의 `version`도 올립니다.
 2. 플러그인 레포에서 배포 전 확인을 합니다: `python3 ../laighthouse-plugin-common/sync.py --dev`
    (태그 대신 이 레포의 작업 중인 파일로 사본을 맞춥니다)
-3. 이 레포에 커밋하고 태그를 붙입니다: `git tag v0.2.0`
+3. 이 레포에 커밋하고 태그를 붙입니다: `git tag v4.0.1`
 4. 플러그인 레포마다 `common.json`의 `version`을 새 태그로 바꾸고 사본을 맞춥니다.
 
    ```sh

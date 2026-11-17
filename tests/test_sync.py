@@ -35,7 +35,7 @@ def common(tmp_path, monkeypatch):
     root = str(tmp_path / "common")
     write(f"{root}/shared/kit/a.py", "A = 1\n")
     write(f"{root}/shared/kit/b.py", "B = 1\n")
-    write(f"{root}/skills/demo/SKILL.md", '---\nname: demo\nmetadata:\n  version: "0.0.0"\n---\n본문 v1\n')
+    write(f"{root}/skills/demo/SKILL.md", '---\nname: demo\nmetadata:\n  version: "4.0.0"\n---\n본문 v1\n')
     write(f"{root}/shared/other.md", "다른 플러그인만 쓴다\n")
     git(root, "init", "-q")
     git(root, "add", ".")
@@ -75,12 +75,6 @@ def test_sync_copies_tagged_content_only_for_included_paths(plugin, common):
     assert not os.path.exists(f"{p}/shared/other.md")   # include에 없는 경로는 가져오지 않는다
     assert read(f"{p}/shared/own.py") == "플러그인 고유 파일\n"   # 공통 레포에 없는 파일은 건드리지 않는다
     assert sync.main(["--repo", plugin, "--check"]) == 0
-
-
-def test_skill_version_line_stays_plugin_specific(plugin, common):
-    sync.main(["--repo", plugin])
-    skill = read(f"{plugin}/plugins/p/skills/demo/SKILL.md")
-    assert '  version: "3.7.1"' in skill and "본문 v1" in skill
 
 
 def test_dev_uses_working_tree(plugin, common):
