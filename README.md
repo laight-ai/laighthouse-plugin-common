@@ -21,6 +21,8 @@
 | `hooks/save_responses.py`, `hooks/capture_ad_performance.py` | 세 플러그인 |
 | `skills/overall-summary`, `skills/overall-summary-*/SKILL.md` | agency·external |
 | `shared/references/mcp-tools.md`, `shared/references/pivot-table.md` | agency·external(analytics의 mcp-tools.md는 내용이 달라 따로 둡니다) |
+| `shared/assets/report_kit.py`·`report_kit.css`·`fees.py`·`fees_legacy.py`·`saved_responses.py` — overall-summary가 쓰는 킷 | agency·external(analytics의 report_kit은 다른 라이브러리라 따로 둡니다) |
+| `hooks/capture_change_raw.py` — 변경 이력 응답 캡처 훅(`capture_ad_performance.py`의 함수를 쓴다) | agency·external |
 
 플러그인이 어느 파일을 가져가는지는 각 플러그인 레포의 `common.json`이 정합니다.
 
@@ -66,6 +68,6 @@
 
 ## 테스트
 
-`tests/`는 external_context 자체 검사, capture 훅, `sync.py` 검사입니다. 수치 회귀 비교는 따로 실행합니다:
+`tests/`는 external_context 자체 검사, 수수료 규칙(`test_fees.py`), 훅 두 개, `sync.py` 검사입니다. 수치 회귀 비교는 따로 실행합니다:
 `python3 tests/regress_external_context.py --responses <응답 폴더> --baseline <기준 폴더>`
 (기준은 같은 명령에 `--write`를 붙여 먼저 만듭니다).
