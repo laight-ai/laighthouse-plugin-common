@@ -49,3 +49,15 @@ def test_reads_host_spill_file_saved_as_json_block_list():
             json.dump([{"type": "text", "text": ENVELOPE}], f)
         stub = run(["campaign_name"], f"Output has been saved to {spill}", "--short-stub")
     assert "200행" in stub
+
+
+def test_spill_path_with_json_inside_a_folder_name_is_read_whole():
+    # 경로 중간의 `.json`에서 끊으면 없는 파일을 열려다 원본을 그대로 넘긴다
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = os.path.join(tmp, "proj.json.d")
+        os.makedirs(folder)
+        spill = os.path.join(folder, "out.txt")
+        with open(spill, "w", encoding="utf-8") as f:
+            f.write(ENVELOPE)
+        stub = run(["campaign_name"], f"Error: result too big. Output has been saved to {spill}. Read it in parts.")
+    assert stub is not None and "200행" in stub
