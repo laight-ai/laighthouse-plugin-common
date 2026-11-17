@@ -18,6 +18,7 @@
 | `shared/assets/external_context/` — 외부 요인 보고서 집계·HTML 킷 | 세 플러그인 |
 | `skills/naver-blog`·`naver-news`·`naver-search`·`weather-impact` | 세 플러그인 |
 | `skills/nextmonth-budget-planning` | 세 플러그인 |
+| `skills/app-guide` — 라이트하우스 웹 화면 사용법 안내(스크립트 없음) | 세 플러그인 |
 | `hooks/save_responses.py`, `hooks/capture_ad_performance.py` | 세 플러그인 |
 | `skills/overall-summary`, `skills/overall-summary-*/SKILL.md` | agency·external |
 | `shared/references/mcp-tools.md`, `shared/references/pivot-table.md` | agency·external(analytics의 mcp-tools.md는 내용이 달라 따로 둡니다) |
