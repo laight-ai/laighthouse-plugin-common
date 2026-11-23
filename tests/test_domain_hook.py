@@ -6,7 +6,16 @@ import subprocess
 import sys
 import uuid
 
+import pytest
+
 HOOK = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hooks", "ad_performance_domain.py"))
+
+
+@pytest.fixture(autouse=True)
+def state_dir(tmp_path, monkeypatch):
+    """세션 상태 파일을 시스템 temp가 아닌 테스트 폴더에 둔다(subprocess가 환경변수를 물려받는다)."""
+    monkeypatch.setenv("LAIGHTHOUSE_DOMAIN_HOOK_STATE", str(tmp_path / "state"))
+    return tmp_path
 
 
 def envelope(*media):
@@ -46,6 +55,7 @@ def test_same_session_sends_each_section_once_and_new_media_later():
     run(session, envelope("naver_sa"))
     again = run(session, envelope("naver_sa"))
     assert "## " not in again and "계속 지킨다" in again             # 이미 보낸 절은 다시 보내지 않는다
+    assert "네이버" in again and "쿠팡" not in again                   # 알림은 실제로 보낸 절 제목으로 만든다
     later = run(session, envelope("naver_sa", "쿠팡"))
     assert "## 쿠팡" in later
     assert "## 네이버" not in later and "## 계약형 상품" not in later
@@ -60,6 +70,19 @@ def test_total_call_without_media_rows_uses_media_filter():
     total = json.dumps({"dimensions": [], "metrics": ["cost"], "rows": [{"cost": 1}]})
     ctx = run(uuid.uuid4().hex, total, group_by=(), filters={"media": ["Google Ads"]})
     assert "## 구글·유튜브" in ctx and "## 네이버" not in ctx
+
+
+def test_media_filter_given_as_single_string():
+    total = json.dumps({"rows": [{"cost": 1}]})
+    assert "## 쿠팡" in run(uuid.uuid4().hex, total, group_by=(), filters={"media": "Coupang"})
+
+
+def test_host_spill_file_is_read_for_media(state_dir):
+    # 호스트가 큰 응답을 파일로 빼고 안내문만 넘겨도 그 파일의 media로 매체 절을 고른다
+    spill = state_dir / "out.txt"
+    spill.write_text(envelope("TikTok"), encoding="utf-8")
+    ctx = run(uuid.uuid4().hex, f"Output has been saved to {spill}")
+    assert "## 틱톡" in ctx and "## 네이버" not in ctx
 
 
 def test_mixing_ad_and_sales_product_dimensions_warns_every_call():
