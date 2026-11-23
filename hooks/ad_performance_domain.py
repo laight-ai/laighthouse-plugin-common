@@ -5,11 +5,9 @@
 "광고집행 상품명"(광고 지표)과 "매출발생 상품명"(매출)을 이어 붙여 상품별 ROAS를 만드는 식이다. 스킬은 모델이 골라야
 불러오므로 빠질 수 있다. 훅은 도구를 부를 때마다 실행되므로 규칙이 항상 들어간다.
 
-무엇을 하나:
-1. 같은 폴더의 `ad_performance_domain.md`를 `## ` 절로 나눈다. `match:` 주석이 있는 절은 매체 절, 없는 절은 공통 절이다.
-2. 세션의 첫 호출에는 공통 절을 넣는다. 응답 행의 media 값(없으면 filters.media)에 매체 절의 키워드가 들어 있으면 그 매체 절도 넣는다.
-3. 이미 넣은 절은 같은 세션에서 다시 넣지 않는다(세션별 상태 파일). 새로 넣을 절이 없으면 한 줄 알림만 붙인다.
-4. group_by에 광고집행 상품 차원과 매출발생 상품 차원이 함께 있으면 매번 경고를 붙인다.
+규칙 원문과 절 형식은 `ad_performance_domain.md`(머리 주석)에 있다. 이 파일은 절을 고르고 세션당 한 번만 넣는다.
+group_by에 광고집행 상품 차원과 매출발생 상품 차원이 함께 있으면 매번 경고를 붙인다 — 차원 키는 테넌트마다 다르고
+한글일 수 있어(예: `상품`) 키에 든 낱말로 판별한다. 다른 이름을 쓰는 테넌트가 생기면 AD_PRODUCT·SALES_PRODUCT에 더한다.
 
 `hookSpecificOutput.additionalContext`만 쓰고 응답(updatedToolOutput)은 건드리지 않는다 — 캡처 훅과 함께 돌아도 된다.
 어떤 오류가 나도 아무것도 출력하지 않고 끝난다(도구 응답은 그대로 전달된다).
@@ -26,11 +24,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from capture_ad_performance import block_text, extract_text, unwrap_json_result  # noqa: E402  (stdin/stdout을 UTF-8로 맞춘다)
 
 RULES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ad_performance_domain.md")
-STATE_ROOT = os.path.join(tempfile.gettempdir(), "laighthouse_domain_hook")
+STATE_ROOT = os.environ.get("LAIGHTHOUSE_DOMAIN_HOOK_STATE") or os.path.join(tempfile.gettempdir(), "laighthouse_domain_hook")
 STALE_SECS = 3 * 24 * 3600
 TAG = "[laighthouse-domain-hook]"
-AD_PRODUCT = "광고집행"
-SALES_PRODUCT = "매출발생"
+AD_PRODUCT = ("광고집행",)
+SALES_PRODUCT = ("매출발생",)
 
 
 def parse_sections(md):
@@ -85,12 +83,14 @@ def media_values(data):
 def load_sent(path):
     try:
         with open(path, encoding="utf-8") as f:
-            return set(json.load(f))
+            sent = json.load(f)
+        return set(sent) if isinstance(sent, list) else set()
     except (OSError, ValueError):
         return set()
 
 
 def save_sent(path, sent):
+    sent = sent | load_sent(path)   # 같은 세션의 병렬 호출이 그사이 기록한 절을 지우지 않는다
     try:
         os.makedirs(STATE_ROOT, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
@@ -111,13 +111,14 @@ def build_context(data):
     state = os.path.join(STATE_ROOT, session + ".json")
     sent = load_sent(state)
 
-    media = media_values(data)
-    new = [(title, body) for title, keywords, body in sections
-           if title not in sent and (not keywords or any(k in m for k in keywords for m in media))]
+    pending = [(title, keywords, body) for title, keywords, body in sections if title not in sent]
+    media = media_values(data) if any(keywords for _, keywords, _ in pending) else set()
+    new = [(title, body) for title, keywords, body in pending
+           if not keywords or any(k in m for k in keywords for m in media)]
 
     parts = []
     group_by = [str(d) for d in ((data.get("tool_input") or {}).get("group_by") or [])]
-    if any(AD_PRODUCT in d for d in group_by) and any(SALES_PRODUCT in d for d in group_by):
+    if any(k in d for k in AD_PRODUCT for d in group_by) and any(k in d for k in SALES_PRODUCT for d in group_by):
         parts.append(f"⚠️ 이번 group_by에 광고집행 상품 차원과 매출발생 상품 차원이 함께 있다({group_by}). 두 차원의 교차 행은 해석하지 않는다 — "
                      "광고 지표는 광고집행 상품명으로, 매출은 매출발생 상품명으로 나눠 다시 조회한다.")
     if new:
@@ -125,7 +126,7 @@ def build_context(data):
         parts.extend(f"## {title}\n{body}" for title, body in new)
         save_sent(state, sent | {title for title, _ in new})
     else:
-        parts.append("이 세션에서 앞서 안내한 광고 성과 도메인 규칙(계약형 BRS, 광고집행/매출발생 상품 구분, 매체별 특이사항)을 계속 지킨다.")
+        parts.append(f"이 세션에서 앞서 안내한 광고 성과 도메인 규칙({', '.join(t for t, _, _ in sections if t in sent)})을 계속 지킨다.")
     return f"{TAG}\n" + "\n\n".join(parts)
 
 
