@@ -41,7 +41,7 @@ def run(session, text, group_by=("media",), filters=None, agent_id=None):
 
 def test_first_call_sends_common_rules_and_only_matching_media_sections():
     ctx = run(uuid.uuid4().hex, envelope("네이버 브랜드검색", "Meta"))
-    assert "집행 도중 예산(계약 금액)을 바꿀 수 없다" in ctx          # BRS 계약형 규칙
+    assert "계약 기간 중에는 예산(계약 금액)을 바꿀 수 없다" in ctx    # BRS 계약형 규칙
     assert "## \"광고집행 상품명\"과 \"매출발생 상품명\"을 섞지 않는다" in ctx
     assert "## 네이버" in ctx and "## 메타(페이스북·인스타그램)" in ctx
     assert "## 쿠팡" not in ctx and "## 구글·유튜브" not in ctx and "## 틱톡" not in ctx
@@ -49,7 +49,7 @@ def test_first_call_sends_common_rules_and_only_matching_media_sections():
 
 def test_sources_in_html_comments_are_not_sent_to_the_model():
     ctx = run(uuid.uuid4().hex, envelope("google"))
-    assert "<!--" not in ctx and "출처" not in ctx and "match:" not in ctx
+    assert "<!--" not in ctx and "https://" not in ctx and "match:" not in ctx
 
 
 def test_same_session_sends_each_section_once_and_new_media_later():
@@ -96,7 +96,7 @@ def test_mixing_ad_and_sales_product_dimensions_warns_every_call():
     assert "⚠️" not in run(session, envelope("meta"), group_by=("광고집행 상품명",))
 
 
-def test_one_sided_product_query_asks_for_the_other_side_every_call():
+def test_one_sided_product_query_asks_for_the_other_side():
     # 쿠팡 보고서 열 이름("광고전환매출발생 상품명")도 매출발생 쪽으로 본다
     session = uuid.uuid4().hex
     ad = run(session, envelope("쿠팡"), group_by=("media", "광고집행 상품명"))
