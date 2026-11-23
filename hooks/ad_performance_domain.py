@@ -158,9 +158,9 @@ def build_context(data):
                      "광고 지표는 광고집행 상품명으로, 매출은 매출발생 상품명으로 나눠 다시 조회한다.")
     elif has_ad or has_sales:
         mine, other = ("광고집행", "매출발생") if has_ad else ("매출발생", "광고집행")
+        rule = next((t for t, keywords, _ in sections if not keywords and AD_PRODUCT[0] in t), "상품 차원")
         parts.append(f"📌 이번 조회는 {mine} 상품 기준이다. 상품별 분석이면 차원 목록에서 {other} 상품 차원을 찾아 같은 기간·필터로 따로 조회하고, "
-                     "묻지 말고 한 답에 ① 광고집행 상품별 광고 성과 ② 매출발생 상품별 매출 ③ 광고비 비중 vs 매출 비중 ④ 옵션 단위 교차 구매를 함께 낸다"
-                     "(규칙 \"\"광고집행 상품명\"과 \"매출발생 상품명\"을 섞지 않는다\" 절). 이미 조회했으면 무시한다.")
+                     f"묻지 말고 규칙 '{rule}' 절의 ①~④ 형식으로 한 답에 함께 낸다. 이미 조회했으면 무시한다.")
     if new:
         parts.append("이 응답을 해석·설명·보고할 때 아래 광고 성과 도메인 규칙을 지킨다.")
         parts.extend(f"## {title}\n{body}" for title, body in new)
