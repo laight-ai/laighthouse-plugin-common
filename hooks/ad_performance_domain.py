@@ -103,8 +103,10 @@ def save_sent(path, sent):
     sent = sent | load_sent(path)   # 같은 세션의 병렬 호출이 그사이 기록한 절을 지우지 않는다
     try:
         os.makedirs(STATE_ROOT, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        tmp = f"{path}.{os.getpid()}.tmp"   # 병렬 호출이 반쯤 쓴 파일을 읽지 않게 바꿔 끼운다
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(sorted(sent), f, ensure_ascii=False)
+        os.replace(tmp, path)
         now = time.time()
         for name in os.listdir(STATE_ROOT):
             p = os.path.join(STATE_ROOT, name)
