@@ -7,7 +7,7 @@
 
 규칙 원문과 절 형식은 `ad_performance_domain.md`(머리 주석)에 있다. 이 파일은 절을 고르고 세션당 한 번만 넣는다.
 group_by에 광고집행 상품 차원과 매출발생 상품 차원이 함께 있으면 매번 경고를 붙인다 — 차원 키는 테넌트마다 다르고
-한글일 수 있어(예: `상품`) 키에 든 낱말로 판별한다. 다른 이름을 쓰는 테넌트가 생기면 AD_PRODUCT·SALES_PRODUCT에 더한다.
+한글일 수 있어 키에 든 낱말(`광고집행`·`매출발생`)로 판별한다. 다른 이름을 쓰는 테넌트가 생기면 AD_PRODUCT·SALES_PRODUCT에 더한다.
 
 세션 기록은 (session_id, agent_id)마다 따로 둔다. 컨텍스트 압축 뒤에는 규칙이 요약에서 빠질 수 있으므로, 같은 명령을
 SessionStart(matcher `compact`)에도 걸어 두면 그 세션 기록을 지워 다음 호출에 규칙을 다시 넣는다.
@@ -65,14 +65,21 @@ def response_text(data):
     return text
 
 
-def media_values(data):
-    """응답 행의 media 값, 없으면 filters.media — 모두 소문자."""
+def media_values(data, keywords):
+    """응답 행의 media 값, 없으면 filters.media — 모두 소문자.
+
+    응답 원문에 남은 매체 키워드가 하나도 없으면 JSON을 파싱하지 않는다(큰 응답을 호출마다 다시 파싱하지 않게).
+    원문이 유니코드 이스케이프(백슬래시 u)로 와서 한글 키워드를 원문에서 못 찾을 수 있으면 그대로 파싱한다."""
     values = set()
-    try:
-        rows = json.loads(response_text(data)).get("rows") or []
-        values = {str(r.get("media")).lower() for r in rows if isinstance(r, dict) and r.get("media")}
-    except (ValueError, AttributeError):
-        pass
+    text = response_text(data)
+    lowered = text.lower()
+    if "\\u" in text or any(k in lowered for k in keywords):
+        try:
+            rows = json.loads(text).get("rows")
+            if isinstance(rows, list):
+                values = {str(r.get("media")).lower() for r in rows if isinstance(r, dict) and r.get("media")}
+        except (ValueError, AttributeError):
+            pass
     if not values:
         filters = (data.get("tool_input") or {}).get("filters")
         media = filters.get("media") if isinstance(filters, dict) else None
@@ -134,7 +141,8 @@ def build_context(data):
     sent = load_sent(state)
 
     pending = [(title, keywords, body) for title, keywords, body in sections if title not in sent]
-    media = media_values(data) if any(keywords for _, keywords, _ in pending) else set()
+    remaining = {k for _, keywords, _ in pending for k in keywords}
+    media = media_values(data, remaining) if remaining else set()
     new = [(title, body) for title, keywords, body in pending
            if not keywords or any(k in m for k in keywords for m in media)]
 

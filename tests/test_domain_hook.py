@@ -57,7 +57,8 @@ def test_same_session_sends_each_section_once_and_new_media_later():
     run(session, envelope("naver_sa"))
     again = run(session, envelope("naver_sa"))
     assert "## " not in again and "계속 지킨다" in again             # 이미 보낸 절은 다시 보내지 않는다
-    assert "네이버" in again and "쿠팡" not in again                   # 알림은 실제로 보낸 절 제목으로 만든다
+    titles = again[again.index("규칙(") + 3:again.index(")을 계속")].split(", ")
+    assert "네이버" in titles and "쿠팡" not in titles                 # 알림은 실제로 보낸 절 제목으로 만든다
     later = run(session, envelope("naver_sa", "쿠팡"))
     assert "## 쿠팡" in later
     assert "## 네이버" not in later and "## 계약형 상품" not in later
@@ -113,6 +114,11 @@ def test_compaction_makes_the_next_call_resend_the_rules():
     assert out == ""
     assert "## 계약형 상품" in run(session, envelope("meta"))
     assert "## 계약형 상품" in run(session, envelope("meta"), agent_id="agent-1")
+
+
+def test_escaped_korean_media_is_still_matched():
+    escaped = json.dumps({"rows": [{"media": "쿠팡"}]}, ensure_ascii=True)   # 원문에 "쿠팡" 글자가 없다
+    assert "## 쿠팡" in run(uuid.uuid4().hex, escaped)
 
 
 def test_bad_input_prints_nothing():
