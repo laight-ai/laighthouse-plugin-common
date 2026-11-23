@@ -106,14 +106,16 @@ def test_subagent_in_same_session_gets_its_own_copy_of_the_rules():
 
 
 def test_compaction_makes_the_next_call_resend_the_rules():
-    session = uuid.uuid4().hex
+    session, other = uuid.uuid4().hex, uuid.uuid4().hex
     run(session, envelope("meta"))
     run(session, envelope("meta"), agent_id="agent-1")
-    out = subprocess.run([sys.executable, HOOK], capture_output=True, text=True, encoding="utf-8", check=True,
+    run(other, envelope("meta"))
+    out =subprocess.run([sys.executable, HOOK], capture_output=True, text=True, encoding="utf-8", check=True,
                          input=json.dumps({"session_id": session, "hook_event_name": "SessionStart", "source": "compact"})).stdout
     assert out == ""
     assert "## 계약형 상품" in run(session, envelope("meta"))
     assert "## 계약형 상품" in run(session, envelope("meta"), agent_id="agent-1")
+    assert "## " not in run(other, envelope("meta"))                     # 다른 세션 기록은 지우지 않는다
 
 
 def test_escaped_korean_media_is_still_matched():
