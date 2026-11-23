@@ -20,6 +20,7 @@
 | `skills/nextmonth-budget-planning` | 세 플러그인 |
 | `skills/app-guide` — 라이트하우스 웹 화면 사용법 안내(스크립트 없음) | 세 플러그인 |
 | `hooks/save_responses.py`, `hooks/capture_ad_performance.py` | 세 플러그인 |
+| `hooks/ad_performance_domain.py`·`ad_performance_domain.md` — `get_ad_performance` 응답 뒤에 광고 성과 도메인 규칙(계약형 BRS, 광고집행/매출발생 상품 구분, 매체별 특이사항)을 세션당 한 번 넣는 훅(`capture_ad_performance.py`의 함수를 쓴다). 규칙은 `.md`에서 고친다 | 세 플러그인 |
 | `skills/overall-summary`, `skills/overall-summary-*/SKILL.md` | agency·external |
 | `shared/references/mcp-tools.md`, `shared/references/pivot-table.md` | agency·external(analytics의 mcp-tools.md는 내용이 달라 따로 둡니다) |
 | `shared/assets/report_kit.py`·`report_kit.css`·`fees.py`·`fees_legacy.py`·`saved_responses.py` — overall-summary가 쓰는 킷 | agency·external(analytics의 report_kit은 다른 라이브러리라 따로 둡니다) |
