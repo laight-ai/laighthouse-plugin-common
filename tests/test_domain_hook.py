@@ -96,6 +96,17 @@ def test_mixing_ad_and_sales_product_dimensions_warns_every_call():
     assert "⚠️" not in run(session, envelope("meta"), group_by=("광고집행 상품명",))
 
 
+def test_one_sided_product_query_asks_for_the_other_side_every_call():
+    # 쿠팡 보고서 열 이름("광고전환매출발생 상품명")도 매출발생 쪽으로 본다
+    session = uuid.uuid4().hex
+    ad = run(session, envelope("쿠팡"), group_by=("media", "광고집행 상품명"))
+    assert "📌" in ad and "매출발생 상품 차원을 찾아" in ad
+    sales = run(session, envelope("쿠팡"), group_by=("광고전환매출발생 상품명",))
+    assert "📌" in sales and "광고집행 상품 차원을 찾아" in sales
+    assert "📌" not in run(session, envelope("쿠팡"), group_by=("media", "campaign_name"))
+    assert "📌" not in run(session, envelope("쿠팡"), group_by=("광고집행 상품명", "매출발생 상품명"))   # 둘 다면 경고 쪽
+
+
 def test_subagent_in_same_session_gets_its_own_copy_of_the_rules():
     session = uuid.uuid4().hex
     run(session, envelope("meta"))
