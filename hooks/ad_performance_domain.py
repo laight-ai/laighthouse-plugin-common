@@ -9,6 +9,9 @@
 group_by에 광고집행 상품 차원과 매출발생 상품 차원이 함께 있으면 매번 경고를 붙인다 — 차원 키는 테넌트마다 다르고
 한글일 수 있어(예: `상품`) 키에 든 낱말로 판별한다. 다른 이름을 쓰는 테넌트가 생기면 AD_PRODUCT·SALES_PRODUCT에 더한다.
 
+세션 기록은 (session_id, agent_id)마다 따로 둔다. 컨텍스트 압축 뒤에는 규칙이 요약에서 빠질 수 있으므로, 같은 명령을
+SessionStart(matcher `compact`)에도 걸어 두면 그 세션 기록을 지워 다음 호출에 규칙을 다시 넣는다.
+
 `hookSpecificOutput.additionalContext`만 쓰고 응답(updatedToolOutput)은 건드리지 않는다 — 캡처 훅과 함께 돌아도 된다.
 어떤 오류가 나도 아무것도 출력하지 않고 끝난다(도구 응답은 그대로 전달된다).
 """
@@ -104,11 +107,30 @@ def save_sent(path, sent):
         pass
 
 
+def safe(value):
+    return re.sub(r"[^A-Za-z0-9_-]", "_", str(value))[:48]
+
+
+def session_key(data):
+    return safe(data.get("session_id") or "nosession")
+
+
+def forget_session(data):
+    """SessionStart(compact): 압축 요약에서 규칙 본문이 빠질 수 있으므로 그 세션의 기록을 지워 다음 호출에 다시 넣게 한다."""
+    prefix = session_key(data) + "__"
+    try:
+        for name in os.listdir(STATE_ROOT):
+            if name.startswith(prefix):
+                os.remove(os.path.join(STATE_ROOT, name))
+    except OSError:
+        pass
+
+
 def build_context(data):
     with open(RULES, encoding="utf-8") as f:
         sections = parse_sections(f.read())
-    session = re.sub(r"[^A-Za-z0-9_-]", "_", str(data.get("session_id") or "nosession"))[:48]
-    state = os.path.join(STATE_ROOT, session + ".json")
+    # 서브에이전트는 부모와 같은 session_id에 agent_id가 따로 붙는다 — 컨텍스트가 따로라 상태도 따로 둔다
+    state = os.path.join(STATE_ROOT, f"{session_key(data)}__{safe(data.get('agent_id') or 'main')}.json")
     sent = load_sent(state)
 
     pending = [(title, keywords, body) for title, keywords, body in sections if title not in sent]
@@ -117,7 +139,8 @@ def build_context(data):
            if not keywords or any(k in m for k in keywords for m in media)]
 
     parts = []
-    group_by = [str(d) for d in ((data.get("tool_input") or {}).get("group_by") or [])]
+    group_by = (data.get("tool_input") or {}).get("group_by") or []
+    group_by = [str(d) for d in ([group_by] if isinstance(group_by, str) else group_by)]
     if any(k in d for k in AD_PRODUCT for d in group_by) and any(k in d for k in SALES_PRODUCT for d in group_by):
         parts.append(f"⚠️ 이번 group_by에 광고집행 상품 차원과 매출발생 상품 차원이 함께 있다({group_by}). 두 차원의 교차 행은 해석하지 않는다 — "
                      "광고 지표는 광고집행 상품명으로, 매출은 매출발생 상품명으로 나눠 다시 조회한다.")
@@ -126,13 +149,17 @@ def build_context(data):
         parts.extend(f"## {title}\n{body}" for title, body in new)
         save_sent(state, sent | {title for title, _ in new})
     else:
-        parts.append(f"이 세션에서 앞서 안내한 광고 성과 도메인 규칙({', '.join(t for t, _, _ in sections if t in sent)})을 계속 지킨다.")
+        titles = ", ".join(t for t, _, _ in sections if t in sent)
+        parts.append(f"이 세션에서 앞서 안내한 광고 성과 도메인 규칙{f'({titles})' if titles else ''}을 계속 지킨다.")
     return f"{TAG}\n" + "\n\n".join(parts)
 
 
 def main():
     try:
         data = json.load(sys.stdin)
+        if data.get("hook_event_name") == "SessionStart":
+            forget_session(data)
+            return
         context = build_context(data)
     except Exception:  # noqa: BLE001 — 훅 실패가 도구 응답을 막으면 안 된다
         return

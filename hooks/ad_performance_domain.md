@@ -5,7 +5,7 @@ get_ad_performance 도메인 규칙 — hooks/ad_performance_domain.py가 읽어
 - `## ` 제목 하나가 한 절이다.
 - 제목 바로 아래에 `match: 키워드, 키워드` 주석이 있는 절은 매체 절이다. 응답 행의 media 값(소문자)에
   키워드가 하나라도 들어 있으면 넣는다. match가 없는 절은 공통 절로, 세션의 첫 호출에 항상 넣는다.
-- 각 절은 세션마다 한 번만 넣는다(같은 세션에서 다시 부르면 짧은 알림만 붙는다).
+- 각 절은 세션(서브에이전트는 따로)마다 한 번만 넣는다(다시 부르면 짧은 알림만 붙는다). 컨텍스트 압축 뒤에는 다시 넣는다.
 - HTML 주석(출처 등)은 모델에게 보내지 않는다. 내용을 고치면 출처도 함께 고친다.
 -->
 
@@ -64,7 +64,7 @@ get_ad_performance 도메인 규칙 — hooks/ad_performance_domain.py가 읽어
 <!-- match: kakao, 카카오, 비즈보드, bizboard, 모먼트, moment -->
 
 - **카카오모먼트(비즈보드·디스플레이·동영상 등) 성과형:** 경매형. 비즈보드는 카카오톡 채팅 목록 상단 배너라 노출 규모가 크고 CTR은 낮은 편이다.
-- **비즈보드 CPT·브랜드검색:** 보장형·계약형 — 집행 중 예산 조정을 제안하지 않는다. 브랜드검색은 10~90일 계약, 키워드 쿼리수 구간과 기간으로 금액이 정해진다.
+- **비즈보드 CPT·브랜드검색:** 계약형 — 앞 절 규칙. 브랜드검색 금액은 키워드 쿼리수 구간과 기간으로 정해진다.
 - **키워드광고:** 검색 CPC 경매 — 네이버 검색광고와 같은 방식으로 본다.
 <!-- 출처: https://cs.kakao.com/helps_html/1073200638?locale=ko , https://cs.kakao.com/helps_html/1073200641?locale=ko ,
      https://kakaobusiness.gitbook.io/main/ad/moment/guarantee/cpt/process -->

@@ -22,11 +22,13 @@ def envelope(*media):
     return json.dumps({"dimensions": ["media"], "metrics": ["cost"], "rows": [{"media": m, "cost": 1} for m in media]})
 
 
-def run(session, text, group_by=("media",), filters=None):
+def run(session, text, group_by=("media",), filters=None, agent_id=None):
     """훅을 실행해 모델에게 붙는 additionalContext를 돌려준다. 출력이 없으면 None."""
-    inp = {"session_id": session, "tool_name": "mcp__laighthouse__get_ad_performance",
-           "tool_input": {"group_by": list(group_by), "filters": filters},
+    inp = {"session_id": session, "hook_event_name": "PostToolUse", "tool_name": "mcp__laighthouse__get_ad_performance",
+           "tool_input": {"group_by": group_by if isinstance(group_by, str) else list(group_by), "filters": filters},
            "tool_response": [{"type": "text", "text": text}]}
+    if agent_id:
+        inp["agent_id"] = agent_id
     out = subprocess.run([sys.executable, HOOK], input=json.dumps(inp), capture_output=True,
                          text=True, encoding="utf-8", check=True).stdout
     if not out:
@@ -91,6 +93,26 @@ def test_mixing_ad_and_sales_product_dimensions_warns_every_call():
     assert "⚠️" in run(session, envelope("meta"), group_by=dims)
     assert "⚠️" in run(session, envelope("meta"), group_by=dims)      # 세션 중복 제거와 관계없이 매번
     assert "⚠️" not in run(session, envelope("meta"), group_by=("광고집행 상품명",))
+
+
+def test_subagent_in_same_session_gets_its_own_copy_of_the_rules():
+    session = uuid.uuid4().hex
+    run(session, envelope("meta"))
+    sub = run(session, envelope("meta"), agent_id="agent-1")
+    assert "## 계약형 상품" in sub and "## 메타(페이스북·인스타그램)" in sub
+    assert "## " not in run(session, envelope("meta"), agent_id="agent-1")
+    assert "## " not in run(session, envelope("meta"))                  # 메인 기록은 그대로
+
+
+def test_compaction_makes_the_next_call_resend_the_rules():
+    session = uuid.uuid4().hex
+    run(session, envelope("meta"))
+    run(session, envelope("meta"), agent_id="agent-1")
+    out = subprocess.run([sys.executable, HOOK], capture_output=True, text=True, encoding="utf-8", check=True,
+                         input=json.dumps({"session_id": session, "hook_event_name": "SessionStart", "source": "compact"})).stdout
+    assert out == ""
+    assert "## 계약형 상품" in run(session, envelope("meta"))
+    assert "## 계약형 상품" in run(session, envelope("meta"), agent_id="agent-1")
 
 
 def test_bad_input_prints_nothing():
