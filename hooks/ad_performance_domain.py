@@ -35,10 +35,10 @@ STALE_SECS = 3 * 24 * 3600
 TAG = "[laighthouse-domain-hook]"
 AD_PRODUCT = ("광고집행",)
 SALES_PRODUCT = ("매출발생",)
-# 매 호출 점검하는 매체 — 규칙 절을 이미 보냈어도 응답에 있으면 안내를 붙인다
-BRS = ("brs", "브랜드검색")
+BRS = ("brs", "브랜드검색")   # 원문 사전 검사용. 행 판별은 is_naver_brs
 COUPANG = ("coupang", "쿠팡")
 COUPANG_LAG_DAYS = 14
+KST = datetime.timezone(datetime.timedelta(hours=9))
 
 
 def parse_sections(md):
@@ -145,7 +145,13 @@ def forget_session(data):
 def today():
     """테스트가 날짜를 고정할 수 있게 LAIGHTHOUSE_DOMAIN_HOOK_TODAY(YYYY-MM-DD)를 먼저 본다."""
     fixed = os.environ.get("LAIGHTHOUSE_DOMAIN_HOOK_TODAY")
-    return datetime.date.fromisoformat(fixed) if fixed else datetime.date.today()
+    # 광고 데이터 날짜는 한국 기준이다 — UTC로 도는 환경에서도 하루 어긋나지 않게 KST로 센다
+    return datetime.date.fromisoformat(fixed) if fixed else datetime.datetime.now(KST).date()
+
+
+def is_naver_brs(media):
+    """매체 값이 네이버 브랜드검색인가 — `BRS` 낱말, 또는 네이버와 함께 쓴 `브랜드검색`(카카오 브랜드검색은 아니다)."""
+    return bool(re.search(r"(?<![a-z])brs(?![a-z])", media)) or ("브랜드검색" in media and ("네이버" in media or "naver" in media))
 
 
 def coupang_lag_note(data):
@@ -157,12 +163,13 @@ def coupang_lag_note(data):
     except ValueError:
         return None
     # d일 클릭에는 d+14일까지 전환이 붙는다 — 오늘이 d+14일 이하면 d일은 아직 잠정, d+15일부터 확정
-    first_open = today() - datetime.timedelta(days=COUPANG_LAG_DAYS)
+    now = today()
+    first_open = now - datetime.timedelta(days=COUPANG_LAG_DAYS)
     if end < first_open:
         return None
     first = max(start, first_open)
     final = end + datetime.timedelta(days=COUPANG_LAG_DAYS + 1)
-    return (f"⏳ 쿠팡: 오늘({today()}) 기준 {first} 이후 성과는 14일 기여 기간이 끝나지 않아 전환·매출·주문·ROAS가 더 늘 수 있다"
+    return (f"⏳ 쿠팡: 오늘({now}) 기준 {first} 이후 성과는 14일 기여 기간이 끝나지 않아 전환·매출·주문·ROAS가 더 늘 수 있다"
             f"({end}까지 확정되는 날 {final}). 답 첫머리에 이 잠정 구간을 날짜로 밝히고, 확정된 기간과 비교해 '하락'이라 하지 않는다"
             " — 광고비·노출·클릭은 지연이 없다.")
 
@@ -181,7 +188,7 @@ def build_context(data):
            if not keywords or any(k in m for k in keywords for m in media)]
 
     parts = []
-    if any(k in m for k in BRS for m in media):
+    if any(is_naver_brs(m) for m in media):
         parts.append("⚠️ 응답에 BRS(네이버 브랜드검색) 행이 있다. BRS는 계약형이라 광고비가 없거나 실제 계약금과 달라 BRS 매출을 합치면 ROAS가 부풀려진다 — "
                      "네이버·전체 합계와 ROAS는 BRS를 뺀 값으로 내고(\"BRS 제외\"라고 밝힌다), BRS는 별도 행으로 따로 보인다. BRS 광고비가 없거나 0이면 BRS ROAS는 산출하지 않는다.")
     if any(k in m for k in COUPANG for m in media):

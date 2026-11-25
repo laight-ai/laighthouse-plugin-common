@@ -157,6 +157,11 @@ def test_brs_row_warns_on_every_call_and_other_media_do_not():
     assert BRS_WARNING not in run(uuid.uuid4().hex, envelope("NVSHOP", "NVGFA_ADVOOST", "PLINK"))
 
 
+def test_brs_warning_is_for_naver_brand_search_only():
+    assert BRS_WARNING in run(uuid.uuid4().hex, envelope("네이버 브랜드검색"))
+    assert BRS_WARNING not in run(uuid.uuid4().hex, envelope("카카오 브랜드검색", "Kakao"))   # 카카오 브랜드검색을 네이버 BRS로 오인하지 않는다
+
+
 @pytest.fixture
 def today_20261125(monkeypatch):
     monkeypatch.setenv("LAIGHTHOUSE_DOMAIN_HOOK_TODAY", "2026-11-25")
