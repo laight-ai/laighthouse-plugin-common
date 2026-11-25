@@ -69,6 +69,12 @@ def test_other_session_gets_rules_again():
     assert "## 틱톡" in run(uuid.uuid4().hex, envelope("tiktok"))
 
 
+def test_naver_alias_without_naver_in_media_value_still_gets_naver_rules():
+    # 매체 값에 naver·gfa 없이 ADVoost 오표기만 들어와도 네이버 절이 빠지면 안 된다
+    ctx = run(uuid.uuid4().hex, envelope("Adboost 쇼핑"))
+    assert "## 네이버" in ctx and "## 쿠팡" not in ctx
+
+
 def test_total_call_without_media_rows_uses_media_filter():
     total = json.dumps({"dimensions": [], "metrics": ["cost"], "rows": [{"cost": 1}]})
     ctx = run(uuid.uuid4().hex, total, group_by=(), filters={"media": ["Google Ads"]})
