@@ -22,11 +22,13 @@ def envelope(*media):
     return json.dumps({"dimensions": ["media"], "metrics": ["cost"], "rows": [{"media": m, "cost": 1} for m in media]})
 
 
-def run(session, text, group_by=("media",), filters=None, agent_id=None):
+def run(session, text, group_by=("media",), filters=None, agent_id=None, start_date=None, end_date=None):
     """훅을 실행해 모델에게 붙는 additionalContext를 돌려준다. 출력이 없으면 None."""
+    tool_input = {"group_by": group_by if isinstance(group_by, str) else list(group_by), "filters": filters}
+    if start_date:
+        tool_input.update(start_date=start_date, end_date=end_date)
     inp = {"session_id": session, "hook_event_name": "PostToolUse", "tool_name": "mcp__laighthouse__get_ad_performance",
-           "tool_input": {"group_by": group_by if isinstance(group_by, str) else list(group_by), "filters": filters},
-           "tool_response": [{"type": "text", "text": text}]}
+           "tool_input": tool_input, "tool_response": [{"type": "text", "text": text}]}
     if agent_id:
         inp["agent_id"] = agent_id
     out = subprocess.run([sys.executable, HOOK], input=json.dumps(inp), capture_output=True,
@@ -143,3 +145,36 @@ def test_escaped_korean_media_is_still_matched():
 def test_bad_input_prints_nothing():
     out = subprocess.run([sys.executable, HOOK], input="not json", capture_output=True, text=True, check=True).stdout
     assert out == ""
+
+
+BRS_WARNING = "응답에 BRS(네이버 브랜드검색) 행이 있다"
+
+
+def test_brs_row_warns_on_every_call_and_other_media_do_not():
+    session = uuid.uuid4().hex
+    assert BRS_WARNING in run(session, envelope("BRS", "NVSHOP", "PLINK"))
+    assert BRS_WARNING in run(session, envelope("BRS", "NVSHOP"))   # 규칙 절을 이미 보낸 뒤에도 매번
+    assert BRS_WARNING not in run(uuid.uuid4().hex, envelope("NVSHOP", "NVGFA_ADVOOST", "PLINK"))
+
+
+@pytest.fixture
+def today_20261125(monkeypatch):
+    monkeypatch.setenv("LAIGHTHOUSE_DOMAIN_HOOK_TODAY", "2026-11-25")
+
+
+def test_coupang_period_inside_14_days_gets_provisional_dates_every_call(today_20261125):
+    session = uuid.uuid4().hex
+    first = run(session, envelope("쿠팡"), start_date="2026-11-01", end_date="2026-11-20")
+    # 11/25 기준 11/11 클릭부터 14일 기여가 안 끝났다. 11/20까지는 12/5에 확정
+    assert "2026-11-11 이후 성과" in first and "2026-12-05" in first
+    again = run(session, envelope("쿠팡"), start_date="2026-11-15", end_date="2026-11-24")
+    assert "2026-11-15 이후 성과" in again   # 쿠팡 절을 이미 보낸 뒤에도, 기간 시작이 더 늦으면 그 날짜부터
+
+
+def test_coupang_lag_boundary_is_today_minus_14(today_20261125):
+    assert "⏳" in run(uuid.uuid4().hex, envelope("Coupang"), start_date="2026-10-01", end_date="2026-11-11")
+    assert "⏳" not in run(uuid.uuid4().hex, envelope("Coupang"), start_date="2026-10-01", end_date="2026-11-10")
+
+
+def test_lag_note_is_only_for_coupang(today_20261125):
+    assert "⏳" not in run(uuid.uuid4().hex, envelope("Meta"), start_date="2026-11-01", end_date="2026-11-24")
