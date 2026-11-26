@@ -18,6 +18,7 @@
 | `shared/assets/external_context/` — 외부 요인 보고서 집계·HTML 킷 | 세 플러그인 |
 | `skills/naver-blog`·`naver-news`·`naver-search`·`weather-impact` | 세 플러그인 |
 | `skills/nextmonth-budget-planning` | 세 플러그인 |
+| `skills/media-mix-backtest-check` — 예산안 백테스트 타당성 점검(저장 응답을 읽어 판정 · HTML 작성. `saved_responses.py` 를 쓴다) | 세 플러그인 |
 | `skills/app-guide` — 라이트하우스 웹 화면 사용법 안내(스크립트 없음) | 세 플러그인 |
 | `hooks/save_responses.py`, `hooks/capture_ad_performance.py` | 세 플러그인 |
 | `hooks/ad_performance_domain.py`·`ad_performance_domain.md` — `get_ad_performance` 응답 뒤에 광고 성과 도메인 규칙(계약형 BRS, 광고집행/매출발생 상품 구분, 매체별 특이사항)을 세션당 한 번 넣는 훅(`capture_ad_performance.py`의 함수를 쓴다). 규칙은 `.md`에서 고친다. `hooks.json`에는 같은 명령을 PostToolUse(`get_ad_performance`)와 SessionStart(matcher `compact`, 압축 뒤 다시 넣기) 두 곳에 건다 | 세 플러그인 |
