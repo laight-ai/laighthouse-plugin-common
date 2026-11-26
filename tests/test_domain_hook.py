@@ -23,7 +23,7 @@ def envelope(*media):
 
 
 def run(session, text, group_by=("media",), filters=None, agent_id=None, start_date=None, end_date=None):
-    """훅을 실행해 모델에게 붙는 additionalContext를 돌려준다. 출력이 없으면 None."""
+    """훅을 실행해 모델에게 붙는 additionalContext를 돌려준다. 출력이 없으면 ""."""
     tool_input = {"group_by": group_by if isinstance(group_by, str) else list(group_by), "filters": filters}
     if start_date:
         tool_input.update(start_date=start_date, end_date=end_date)
@@ -34,7 +34,7 @@ def run(session, text, group_by=("media",), filters=None, agent_id=None, start_d
     out = subprocess.run([sys.executable, HOOK], input=json.dumps(inp), capture_output=True,
                          text=True, encoding="utf-8", check=True).stdout
     if not out:
-        return None
+        return ""
     hso = json.loads(out)["hookSpecificOutput"]
     assert hso["hookEventName"] == "PostToolUse"
     assert "updatedToolOutput" not in hso   # 응답 자체는 바꾸지 않는다(캡처 훅과 충돌 금지)
@@ -57,10 +57,7 @@ def test_sources_in_html_comments_are_not_sent_to_the_model():
 def test_same_session_sends_each_section_once_and_new_media_later():
     session = uuid.uuid4().hex
     run(session, envelope("naver_sa"))
-    again = run(session, envelope("naver_sa"))
-    assert "## " not in again and "계속 지킨다" in again             # 이미 보낸 절은 다시 보내지 않는다
-    titles = again[again.index("규칙(") + 3:again.index(")을 계속")].split(", ")
-    assert "네이버" in titles and "쿠팡" not in titles                 # 알림은 실제로 보낸 절 제목으로 만든다
+    assert run(session, envelope("naver_sa")) == ""   # 이미 보낸 절만 해당하면 아무것도 붙이지 않는다(반복 알림 없음)
     later = run(session, envelope("naver_sa", "쿠팡"))
     assert "## 쿠팡" in later
     assert "## 네이버" not in later and "## 계약형 상품" not in later
@@ -120,8 +117,8 @@ def test_subagent_in_same_session_gets_its_own_copy_of_the_rules():
     run(session, envelope("meta"))
     sub = run(session, envelope("meta"), agent_id="agent-1")
     assert "## 계약형 상품" in sub and "## 메타(페이스북·인스타그램)" in sub
-    assert "## " not in run(session, envelope("meta"), agent_id="agent-1")
-    assert "## " not in run(session, envelope("meta"))                  # 메인 기록은 그대로
+    assert run(session, envelope("meta"), agent_id="agent-1") == ""
+    assert run(session, envelope("meta")) == ""                         # 메인 기록은 그대로
 
 
 def test_compaction_makes_the_next_call_resend_the_rules():
@@ -134,7 +131,7 @@ def test_compaction_makes_the_next_call_resend_the_rules():
     assert out == ""
     assert "## 계약형 상품" in run(session, envelope("meta"))
     assert "## 계약형 상품" in run(session, envelope("meta"), agent_id="agent-1")
-    assert "## " not in run(other, envelope("meta"))                     # 다른 세션 기록은 지우지 않는다
+    assert run(other, envelope("meta")) == ""                            # 다른 세션 기록은 지우지 않는다
 
 
 def test_escaped_korean_media_is_still_matched():
@@ -150,11 +147,13 @@ def test_bad_input_prints_nothing():
 BRS_WARNING = "응답에 BRS(네이버 브랜드검색) 행이 있다"
 
 
-def test_brs_row_warns_on_every_call_and_other_media_do_not():
+def test_brs_warning_once_per_session_even_when_brs_first_appears_late():
     session = uuid.uuid4().hex
-    assert BRS_WARNING in run(session, envelope("BRS", "NVSHOP", "PLINK"))
-    assert BRS_WARNING in run(session, envelope("BRS", "NVSHOP"))   # 규칙 절을 이미 보낸 뒤에도 매번
-    assert BRS_WARNING not in run(uuid.uuid4().hex, envelope("NVSHOP", "NVGFA_ADVOOST", "PLINK"))
+    assert BRS_WARNING not in run(session, envelope("NVSHOP", "NVGFA_ADVOOST", "PLINK"))
+    late = run(session, envelope("BRS", "NVSHOP"))   # 네이버 절은 이미 보냈어도 BRS가 처음 나오면 경고한다
+    assert BRS_WARNING in late and "## " not in late
+    assert run(session, envelope("BRS", "NVSHOP")) == ""             # 두 번째부터는 붙이지 않는다
+    assert BRS_WARNING in run(session, envelope("BRS"), agent_id="agent-1")   # 서브에이전트는 따로
 
 
 def test_brs_warning_is_for_naver_brand_search_only():
@@ -171,9 +170,11 @@ def test_coupang_period_inside_14_days_gets_provisional_dates_every_call(today_2
     session = uuid.uuid4().hex
     first = run(session, envelope("쿠팡"), start_date="2026-11-01", end_date="2026-11-20")
     # 11/25 기준 11/11 클릭부터 14일 기여가 안 끝났다. 11/20까지는 12/5에 확정
-    assert "2026-11-11 이후 성과" in first and "2026-12-05" in first
+    assert "2026-11-11~2026-11-20" in first and "2026-12-05 확정" in first
     again = run(session, envelope("쿠팡"), start_date="2026-11-15", end_date="2026-11-24")
-    assert "2026-11-15 이후 성과" in again   # 쿠팡 절을 이미 보낸 뒤에도, 기간 시작이 더 늦으면 그 날짜부터
+    # 쿠팡 절을 이미 보낸 뒤에도 붙고, 기간 시작이 더 늦으면 그 날짜부터. 날짜 한 줄만 붙는다
+    assert "2026-11-15~2026-11-24" in again
+    assert again.startswith("[laighthouse-domain-hook]\n⏳") and again.count("\n") == 1
 
 
 def test_coupang_lag_boundary_is_today_minus_14(today_20261125):
