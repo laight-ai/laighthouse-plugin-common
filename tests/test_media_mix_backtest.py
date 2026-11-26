@@ -59,7 +59,8 @@ def save(tmp, n, tool, tool_input, response):
     os.makedirs(folder, exist_ok=True)
     with open(os.path.join(folder, f"{n:03d}_{tool}.json"), "w", encoding="utf-8") as f:
         json.dump({"tool_name": f"mcp__laighthouse__{tool}", "tool_input": {"brand_name": BRAND, **tool_input},
-                   "saved_at": time.time() + n, "response": json.dumps(response, ensure_ascii=False)}, f)
+                   "saved_at": time.time() + n,
+                   "response": response if isinstance(response, str) else json.dumps(response, ensure_ascii=False)}, f)
 
 
 def run(tmp, script, *args, code=0):
@@ -133,3 +134,44 @@ def test_a_failed_month_is_listed_and_the_rest_are_judged(tmp_path):
     out = run(tmp, "build_report.py", "--months", "2026-09,2026-10", "--out", os.path.join(tmp, "r.html"))
     assert out["facts"]["months"] == ["2026-10"]
     assert out["facts"]["failed"] == [{"target_month": "2026-09", "error": "학습 데이터 부족"}]
+
+
+def test_a_medium_with_no_outcome_two_months_before_is_unknown_not_a_crash(tmp_path):
+    # 검색의 2026-07(i=10) 매출이 0이면 효율 추세를 셀 수 없다 — 판단 불가로 두고 보고서는 나온다
+    tmp = str(tmp_path)
+    env = envelope()
+    for row in env["rows"]:
+        if row["media"] == "검색" and row["month"] == "2026-07":
+            row["매출"] = 0
+    save(tmp, 1, "get_ad_performance", ad_call("2025-09-01", "2026-10-31"), env)
+    save(tmp, 2, "get_media_mix_job", {"job_id": "a"}, job("2026-10"))
+    out = run(tmp, "build_report.py", "--months", "2026-10", "--out", os.path.join(tmp, "r.html"))
+    assert ("검색", "trend") not in {(f["media"], f["check"]) for f in out["facts"]["flagged"]}
+    assert out["facts"]["counts"]["trend"] == 1   # 쿠팡만 남는다
+
+
+def test_a_saved_error_for_another_range_does_not_block_a_new_call(tmp_path):
+    # 앞 범위의 조회가 오류였어도 대상 달을 덮지 못하면 다시 부르게 한다(missing). 덮는 범위의 오류는 errors 로 알린다
+    tmp = str(tmp_path)
+    save(tmp, 1, "get_ad_performance", ad_call("2024-12-01", "2026-10-31"), "Error: upstream timeout")
+    (call,) = run(tmp, "prepare.py", "--months", "2025-03")["missing"]
+    assert call["start_date"] == "2024-02-01"
+    assert run(tmp, "prepare.py", "--months", "2026-10")["errors"][0]["response"].startswith("Error: upstream timeout")
+    assert run(tmp, "build_report.py", "--months", "2026-10")["errors"][0]["response"].startswith("Error: upstream timeout")
+
+
+def test_a_job_lookup_error_is_reported_instead_of_missing(tmp_path):
+    tmp = str(tmp_path)
+    save(tmp, 1, "get_ad_performance", ad_call("2025-09-01", "2026-10-31"), envelope())
+    save(tmp, 2, "get_media_mix_job", {"job_id": "a"}, "Error: media-mix is not enabled for this brand")
+    out = run(tmp, "build_report.py", "--months", "2026-10")
+    assert out["missing_jobs"] == ["2026-10"]
+    assert out["errors"] == [{"call": "get_media_mix_job", "response": "Error: media-mix is not enabled for this brand"}]
+
+
+def test_a_change_that_rounds_to_zero_has_no_minus_sign():
+    sys.path.insert(0, ASSETS)
+    import backtest
+    assert backtest.fmt_pct(-0.0004) == "0.0%"
+    assert backtest.fmt_pct(0.0004) == "0.0%"
+    assert backtest.fmt_pct(-0.0006) == "-0.1%"
