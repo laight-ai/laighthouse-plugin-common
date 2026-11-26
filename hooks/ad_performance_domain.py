@@ -11,7 +11,7 @@ group_by에 광고집행 상품 차원과 매출발생 상품 차원이 함께 �
 응답에 BRS(네이버 브랜드검색) 행이 처음 나오면 합계·ROAS에서 빼라는 경고를 붙인다 — BRS는 광고비를 알 수 없어 합치면 매출만 부풀린다.
 규칙 본문처럼 (session_id, agent_id)마다 한 번이다. 같은 내용이 규칙 본문에도 있어 매번 붙이면 토큰만 쌓인다.
 쿠팡 행이 있고 조회 종료일이 오늘 − 14일(그날 포함) 이후면 매번 잠정 구간과 확정일을 한 줄로 붙인다 — 날짜가 조회마다 달라 본문으로 대신할 수 없다.
-붙일 것이 없으면(규칙을 이미 보냈고 경고 조건도 없으면) 아무것도 출력하지 않는다. "규칙을 계속 지켜라" 같은 반복 문구는 넣지 않는다.
+붙일 것이 없으면(규칙을 이미 보냈고 경고 조건도 없으면) 아무것도 출력하지 않는다.
 
 세션 기록은 (session_id, agent_id)마다 따로 둔다. 컨텍스트 압축 뒤에는 규칙이 요약에서 빠질 수 있으므로, 같은 명령을
 SessionStart(matcher `compact`)에도 걸어 두면 그 세션 기록을 지워 다음 호출에 규칙을 다시 넣는다.
@@ -172,7 +172,7 @@ def coupang_lag_note(data):
         return None
     first = max(start, first_open)
     final = end + datetime.timedelta(days=COUPANG_LAG_DAYS + 1)
-    return f"⏳ 쿠팡 {first}~{end} 전환·매출·ROAS는 잠정(14일 기여 미종료, {final} 확정) — 답 첫머리에 밝히고 하락으로 해석하지 않는다."
+    return f"⏳ 쿠팡 {first}~{end} 전환·매출·주문·ROAS는 잠정(14일 기여 미종료, {final} 확정) — 답 첫머리에 밝히고 하락으로 해석하지 않는다."
 
 
 def build_context(data):
